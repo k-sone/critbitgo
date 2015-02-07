@@ -241,14 +241,16 @@ func (t *Trie) Allprefixed(prefix []byte, handle func(key []byte, value interfac
 	// walk tree, maintaining top pointer
 	p := t.root
 	top := p
-	for p.internal {
-		top = p
-		p = p.child[p.direction(prefix)]
-	}
+	if len(prefix) > 0 {
+		for p.internal {
+			top = p
+			p = p.child[p.direction(prefix)]
+		}
 
-	// check prefix
-	if !bytes.Contains(p.key, prefix) {
-		return true
+		// check prefix
+		if !bytes.Contains(p.key, prefix) {
+			return true
+		}
 	}
 
 	return allprefixed(top, handle)
