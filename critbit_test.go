@@ -8,9 +8,6 @@ import (
 	"github.com/k-sone/critbitgo"
 )
 
-var random *rand.Rand = rand.New(rand.NewSource(0))
-var keys []string = []string{"", "a", "aa", "b", "bb", "ab", "ba", "aba", "bab"}
-
 func buildTrie(t *testing.T, keys []string) *critbitgo.Trie {
 	trie := critbitgo.NewTrie()
 	for _, key := range keys {
@@ -29,10 +26,12 @@ func dumpTrie(trie *critbitgo.Trie) string {
 
 func TestInsert(t *testing.T) {
 	// normal build
+	keys := []string{"", "a", "aa", "b", "bb", "ab", "ba", "aba", "bab"}
 	trie := buildTrie(t, keys)
 	dump := dumpTrie(trie)
 
 	// random build
+	random := rand.New(rand.NewSource(0))
 	for i := 0; i < 10; i++ {
 		// shuffle keys
 		lkeys := make([]string, len(keys))
@@ -57,6 +56,7 @@ func TestInsert(t *testing.T) {
 }
 
 func TestSet(t *testing.T) {
+	keys := []string{"", "a", "aa", "b", "bb", "ab", "ba", "aba", "bab"}
 	trie := buildTrie(t, keys)
 
 	if err := trie.Set([]byte("a"), 0); err != nil {
@@ -65,6 +65,7 @@ func TestSet(t *testing.T) {
 }
 
 func TestContains(t *testing.T) {
+	keys := []string{"", "a", "aa", "b", "bb", "ab", "ba", "aba", "bab"}
 	trie := buildTrie(t, keys)
 
 	for _, key := range keys {
@@ -79,6 +80,7 @@ func TestContains(t *testing.T) {
 }
 
 func TestGet(t *testing.T) {
+	keys := []string{"", "a", "aa", "b", "bb", "ab", "ba", "aba", "bab"}
 	trie := buildTrie(t, keys)
 
 	for _, key := range keys {
@@ -93,6 +95,7 @@ func TestGet(t *testing.T) {
 }
 
 func TestDelete(t *testing.T) {
+	keys := []string{"", "a", "aa", "b", "bb", "ab", "ba", "aba", "bab"}
 	trie := buildTrie(t, keys)
 
 	for i, key := range keys {
@@ -116,6 +119,7 @@ func TestDelete(t *testing.T) {
 }
 
 func TestSize(t *testing.T) {
+	keys := []string{"", "a", "aa", "b", "bb", "ab", "ba", "aba", "bab"}
 	trie := buildTrie(t, keys)
 	klen := len(keys)
 	if s := trie.Size(); s != klen {
@@ -131,6 +135,7 @@ func TestSize(t *testing.T) {
 }
 
 func TestAllprefixed(t *testing.T) {
+	keys := []string{"", "a", "aa", "b", "bb", "ab", "ba", "aba", "bab"}
 	trie := buildTrie(t, keys)
 
 	elems := make(map[string]interface{})
