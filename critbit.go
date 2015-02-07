@@ -8,11 +8,9 @@ import (
 	"io"
 	"os"
 	"strconv"
-	"sync"
 )
 
 var (
-	msbOnce   sync.Once
 	msbMatrix [256]byte // The matrix of most significant bit
 
 	KeyExists   error = errors.New("A key already exists")
@@ -321,6 +319,9 @@ func key2str(key []byte) string {
 
 // create a tree.
 func NewTrie() *Trie {
-	msbOnce.Do(buildMsbMatrix)
 	return &Trie{}
+}
+
+func init() {
+	buildMsbMatrix()
 }
