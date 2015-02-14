@@ -53,9 +53,19 @@ func NewSortedMap() *SortedMap {
 
 func mapStrToKey(s string) []byte {
 	// avoid a KeyTailNull
-	return append([]byte(s), 0x2e)
+	if l := len(s); l > 0 {
+		if t := s[l-1]; t == 0x00 || t == 0xff {
+			return append([]byte(s), 0xff)
+		}
+	}
+	return []byte(s)
 }
 
 func mapKeyToStr(k []byte) string {
-	return string(k[:len(k)-1])
+	if l := len(k); l > 0 {
+		if t := k[l-1]; t == 0xff {
+			return string(k[:l-1])
+		}
+	}
+	return string(k)
 }
