@@ -47,6 +47,7 @@ func (m *SortedMap) Each(prefix string, handle func(key string, value interface{
 	})
 }
 
+// Create a SortedMap
 func NewSortedMap() *SortedMap {
 	return &SortedMap{NewTrie()}
 }

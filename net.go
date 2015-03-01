@@ -9,6 +9,8 @@ type Net struct {
 	trie *Trie
 }
 
+// Associates value with `s`.
+// If `s` is not CIDR notation, returns an error.
 func (n *Net) AddCIDR(s string, value interface{}) error {
 	key, err := netCidrToKey(s)
 	if err != nil {
@@ -17,6 +19,8 @@ func (n *Net) AddCIDR(s string, value interface{}) error {
 	return n.trie.Set(key, value)
 }
 
+// Deletes the mapping for `s`.
+// If `s` is not CIDR notation or the mapping is not found, return false.
 func (n *Net) DeleteCIDR(s string) bool {
 	key, err := netCidrToKey(s)
 	if err != nil {
@@ -25,6 +29,8 @@ func (n *Net) DeleteCIDR(s string) bool {
 	return n.trie.Delete(key)
 }
 
+// Returns the value to which `s` is mapped.
+// If `s` is not CIDR notation, returns an error.
 func (n *Net) GetCIDR(s string) (value interface{}, err error) {
 	key, err := netCidrToKey(s)
 	if err == nil {
@@ -35,6 +41,8 @@ func (n *Net) GetCIDR(s string) (value interface{}, err error) {
 	return
 }
 
+// Returns the value by using the longest prefix matching.
+// If `s` is not CIDR notation, returns an error.
 func (n *Net) MatchCIDR(s string) (cidr string, value interface{}, err error) {
 	key, err := netCidrToKey(s)
 	if err == nil {
@@ -95,14 +103,17 @@ func match(p *node, key []byte, backtracking bool) *node {
 	}
 }
 
+// Deletes all mappings
 func (n *Net) Clear() {
 	n.trie.Clear()
 }
 
+// Returns number of mappings
 func (n *Net) Size() int {
 	return n.trie.Size()
 }
 
+// Create IP routing table
 func NewNet() *Net {
 	return &Net{NewTrie()}
 }
