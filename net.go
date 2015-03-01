@@ -1,7 +1,6 @@
 package critbitgo
 
 import (
-	"io"
 	"net"
 )
 
@@ -80,13 +79,13 @@ func match(p *node, key []byte, backtracking bool) *node {
 		}
 
 		// compare both keys with mask
-		div := int(mask / 8)
+		div := int(mask >> 3)
 		for i := 0; i < div; i++ {
 			if p.key[i] != key[i] {
 				return nil
 			}
 		}
-		if mod := uint(mask % 8); mod > 0 {
+		if mod := uint(mask & 0x07); mod > 0 {
 			bit := 8 - mod
 			if p.key[div] != key[div]&(0xff>>bit<<bit) {
 				return nil
@@ -104,13 +103,8 @@ func (n *Net) Size() int {
 	return n.trie.Size()
 }
 
-func (n *Net) Dump(w io.Writer) {
-	n.trie.Dump(w)
-}
-
 func NewNet() *Net {
-	t := NewTrie()
-	return &Net{t}
+	return &Net{NewTrie()}
 }
 
 func netCidrToKey(s string) ([]byte, error) {
