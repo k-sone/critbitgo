@@ -28,21 +28,23 @@ func buildMsbMatrix() {
 }
 
 type node struct {
-	// internal or external
-	internal bool
+	internal *internal
+	external *external
+}
 
-	// internal node attributes
-	child  [2]*node
+type internal struct {
+	child  [2]node
 	offset int
 	bit    byte
+}
 
-	// external node attributes
+type external struct {
 	key   []byte
 	value interface{}
 }
 
 // finding the critical bit.
-func (n *node) criticalBit(key []byte) (offset int, bit byte) {
+func (n *external) criticalBit(key []byte) (offset int, bit byte) {
 	nlen := len(n.key)
 	klen := len(key)
 	mlen := nlen
@@ -70,7 +72,7 @@ func (n *node) criticalBit(key []byte) (offset int, bit byte) {
 }
 
 // calculate direction.
-func (n *node) direction(key []byte) int {
+func (n *internal) direction(key []byte) int {
 	if n.offset < len(key) && key[n.offset]&n.bit != 0 {
 		return 1
 	}
@@ -79,25 +81,22 @@ func (n *node) direction(key []byte) int {
 
 // Crit-bit Tree
 type Trie struct {
-	root *node
+	root node
 	size int
 }
 
 // searching the tree.
 func (t *Trie) search(key []byte) *node {
-	n := t.root
-	for n.internal {
-		n = n.child[n.direction(key)]
+	n := &t.root
+	for n.internal != nil {
+		n = &n.internal.child[n.internal.direction(key)]
 	}
 	return n
 }
 
 // membership testing.
 func (t *Trie) Contains(key []byte) bool {
-	if t.root == nil {
-		return false
-	}
-	if n := t.search(key); n != nil && bytes.Equal(n.key, key) {
+	if n := t.search(key); n.external != nil && bytes.Equal(n.external.key, key) {
 		return true
 	}
 	return false
@@ -105,11 +104,8 @@ func (t *Trie) Contains(key []byte) bool {
 
 // get member.
 func (t *Trie) Get(key []byte) (value interface{}) {
-	if t.root == nil {
-		return
-	}
-	if n := t.search(key); n != nil && bytes.Equal(n.key, key) {
-		value = n.value
+	if n := t.search(key); n.external != nil && bytes.Equal(n.external.key, key) {
+		value = n.external.value
 	}
 	return
 }
@@ -121,8 +117,8 @@ func (t *Trie) insert(key []byte, value interface{}, replace bool) error {
 	}
 
 	// an empty tree
-	if t.root == nil {
-		t.root = &node{
+	if t.size == 0 {
+		t.root.external = &external{
 			key:   key,
 			value: value,
 		}
@@ -131,44 +127,45 @@ func (t *Trie) insert(key []byte, value interface{}, replace bool) error {
 	}
 
 	n := t.search(key)
-	newOffset, newBit := n.criticalBit(key)
+	newOffset, newBit := n.external.criticalBit(key)
 
 	// already exists in the tree
 	if newOffset == -1 {
 		if replace {
-			n.value = value
+			n.external.value = value
 			return nil
 		}
 		return KeyExists
 	}
 
 	// allocate new node
-	newNodes := [2]node{
-		{
-			internal: true,
-			offset:   newOffset,
-			bit:      newBit,
-		},
-		{
-			key:   key,
-			value: value,
-		},
+	newNode := &internal{
+		offset: newOffset,
+		bit:    newBit,
 	}
-	newNode := &newNodes[0]
 	direction := newNode.direction(key)
-	newNode.child[direction] = &newNodes[1]
+//	newNode.child[direction].internal = nil
+	newNode.child[direction].external = &external{
+		key:   key,
+		value: value,
+	}
 
 	// insert new node
-	var wherep **node = &t.root
-	for p := *wherep; p.internal; p = *wherep {
-		if p.offset > newOffset || (p.offset == newOffset && p.bit < newBit) {
+	wherep := &t.root
+	for in := wherep.internal; in != nil; in = wherep.internal {
+		if in.offset > newOffset || (in.offset == newOffset && in.bit < newBit) {
 			break
 		}
-		wherep = &p.child[p.direction(key)]
+		wherep = &in.child[in.direction(key)]
 	}
 
-	newNode.child[1-direction] = *wherep
-	*wherep = newNode
+	if wherep.internal != nil {
+		newNode.child[1-direction].internal = wherep.internal
+	} else {
+		newNode.child[1-direction].external = wherep.external
+		wherep.external = nil
+	}
+	wherep.internal = newNode
 	t.size += 1
 	return nil
 }
@@ -186,32 +183,33 @@ func (t *Trie) Set(key []byte, value interface{}) error {
 // deleting elements.
 func (t *Trie) Delete(key []byte) bool {
 	// an empty tree
-	if t.root == nil {
+	if t.size == 0 {
 		return false
 	}
 
-	var othern *node  // other child of the parent
-	var whereq **node // pointer to the grandparent
+	var direction int
+	var whereq *node // pointer to the grandparent
+	var wherep *node = &t.root
 
 	// finding the best candidate to delete
-	var wherep **node = &t.root
-	for p := *wherep; p.internal; p = *wherep {
-		direction := p.direction(key)
+	for in := wherep.internal; in != nil; in = wherep.internal {
+		direction = in.direction(key)
 		whereq = wherep
-		wherep = &p.child[direction]
-		othern = p.child[1-direction]
+		wherep = &in.child[direction]
 	}
 
 	// checking that we have the right element
-	if !bytes.Equal((*wherep).key, key) {
+	if !bytes.Equal(wherep.external.key, key) {
 		return false
 	}
 
 	// removing the node
 	if whereq == nil {
-		t.root = nil
+		wherep.external = nil
 	} else {
-		*whereq = othern
+		othern := whereq.internal.child[1-direction]
+		whereq.internal = othern.internal
+		whereq.external = othern.external
 	}
 	t.size -= 1
 	return true
@@ -219,7 +217,8 @@ func (t *Trie) Delete(key []byte) bool {
 
 // clearing a tree.
 func (t *Trie) Clear() {
-	t.root = nil
+	t.root.internal = nil
+	t.root.external = nil
 	t.size = 0
 }
 
@@ -232,21 +231,21 @@ func (t *Trie) Size() int {
 // handle is called with arguments key and value (if handle returns `false`, the iteration is aborted)
 func (t *Trie) Allprefixed(prefix []byte, handle func(key []byte, value interface{}) bool) bool {
 	// an empty tree
-	if t.root == nil {
+	if t.size == 0 {
 		return true
 	}
 
 	// walk tree, maintaining top pointer
-	p := t.root
+	p := &t.root
 	top := p
 	if len(prefix) > 0 {
-		for p.internal {
+		for p.internal != nil {
 			top = p
-			p = p.child[p.direction(prefix)]
+			p = &p.internal.child[p.internal.direction(prefix)]
 		}
 
 		// check prefix
-		if !bytes.Contains(p.key, prefix) {
+		if !bytes.Contains(p.external.key, prefix) {
 			return true
 		}
 	}
@@ -255,29 +254,29 @@ func (t *Trie) Allprefixed(prefix []byte, handle func(key []byte, value interfac
 }
 
 func allprefixed(n *node, handle func([]byte, interface{}) bool) bool {
-	if n.internal {
+	if n.internal != nil {
 		// dealing with an internal node while recursing
 		for i := 0; i < 2; i++ {
-			if !allprefixed(n.child[i], handle) {
+			if !allprefixed(&n.internal.child[i], handle) {
 				return false
 			}
 		}
 	} else {
 		// dealing with an external node while recursing
-		return handle(n.key, n.value)
+		return handle(n.external.key, n.external.value)
 	}
 	return true
 }
 
 // dump tree. (for debugging)
 func (t *Trie) Dump(w io.Writer) {
-	if t.root == nil {
+	if t.root.internal == nil && t.root.external == nil {
 		return
 	}
 	if w == nil {
 		w = os.Stdout
 	}
-	dump(w, t.root, true, "")
+	dump(w, &t.root, true, "")
 }
 
 func dump(w io.Writer, n *node, right bool, prefix string) {
@@ -288,8 +287,8 @@ func dump(w io.Writer, n *node, right bool, prefix string) {
 		ownprefix = prefix[:len(prefix)-1] + "`"
 	}
 
-	if n.internal {
-		fmt.Fprintf(w, "%s-- off=%d, bit=%08b (%02x)\n", ownprefix, n.offset, n.bit, n.bit)
+	if in := n.internal; in != nil {
+		fmt.Fprintf(w, "%s-- off=%d, bit=%08b (%02x)\n", ownprefix, in.offset, in.bit, in.bit)
 		for i := 0; i < 2; i++ {
 			var nextprefix string
 			switch i {
@@ -300,10 +299,10 @@ func dump(w io.Writer, n *node, right bool, prefix string) {
 				nextprefix = prefix + "  "
 				right = false
 			}
-			dump(w, n.child[i], right, nextprefix)
+			dump(w, &in.child[i], right, nextprefix)
 		}
 	} else {
-		fmt.Fprintf(w, "%s-- key=%d (%s)\n", ownprefix, n.key, key2str(n.key))
+		fmt.Fprintf(w, "%s-- key=%d (%s)\n", ownprefix, n.external.key, key2str(n.external.key))
 	}
 	return
 }

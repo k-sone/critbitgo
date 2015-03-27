@@ -34,8 +34,8 @@ func (n *Net) DeleteCIDR(s string) bool {
 func (n *Net) GetCIDR(s string) (value interface{}, err error) {
 	key, err := netCidrToKey(s)
 	if err == nil {
-		if node := n.trie.search(key); node != nil {
-			value = node.value
+		if node := n.trie.search(key); node.external != nil {
+			value = node.external.value
 		}
 	}
 	return
@@ -45,43 +45,44 @@ func (n *Net) GetCIDR(s string) (value interface{}, err error) {
 // If `s` is not CIDR notation, returns an error.
 func (n *Net) MatchCIDR(s string) (cidr string, value interface{}, err error) {
 	key, err := netCidrToKey(s)
-	if err == nil {
-		if node := match(n.trie.root, key, false); node != nil {
-			cidr = netKeyToCidr(node.key)
-			value = node.value
-		}
+	if err != nil || n.trie.size == 0 {
+		return
+	}
+	if node := match(&n.trie.root, key, false); node != nil {
+		cidr = netKeyToCidr(node.external.key)
+		value = node.external.value
 	}
 	return
 }
 
 func match(p *node, key []byte, backtracking bool) *node {
-	if p.internal {
+	if p.internal != nil {
 		var direction int
-		if p.offset == len(key)-2 {
+		if p.internal.offset == len(key)-2 {
 			// selecting the larger side when comparing the mask
 			direction = 1
 		} else if backtracking {
 			direction = 0
 		} else {
-			direction = p.direction(key)
+			direction = p.internal.direction(key)
 		}
 
-		if c := match(p.child[direction], key, backtracking); c != nil {
+		if c := match(&p.internal.child[direction], key, backtracking); c != nil {
 			return c
 		}
 		if direction == 1 {
 			// search other node
-			return match(p.child[0], key, true)
+			return match(&p.internal.child[0], key, true)
 		}
 		return nil
 	} else {
-		nlen := len(p.key)
+		nlen := len(p.external.key)
 		if nlen != len(key) {
 			return nil
 		}
 
 		// check mask
-		mask := p.key[nlen-2]
+		mask := p.external.key[nlen-2]
 		if mask > key[nlen-2] {
 			return nil
 		}
@@ -89,13 +90,13 @@ func match(p *node, key []byte, backtracking bool) *node {
 		// compare both keys with mask
 		div := int(mask >> 3)
 		for i := 0; i < div; i++ {
-			if p.key[i] != key[i] {
+			if p.external.key[i] != key[i] {
 				return nil
 			}
 		}
 		if mod := uint(mask & 0x07); mod > 0 {
 			bit := 8 - mod
-			if p.key[div] != key[div]&(0xff>>bit<<bit) {
+			if p.external.key[div] != key[div]&(0xff>>bit<<bit) {
 				return nil
 			}
 		}
