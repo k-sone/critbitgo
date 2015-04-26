@@ -9,7 +9,7 @@ import (
 )
 
 func buildTrie(t *testing.T, keys []string) *critbitgo.Trie {
-	trie := critbitgo.NewTrie()
+	trie := critbitgo.NewTrieWithCapacity(len(keys))
 	for _, key := range keys {
 		if err := trie.Insert([]byte(key), key); err != nil {
 			t.Errorf("Insert() - failed insert \"%s\"\n%s", key, dumpTrie(trie))

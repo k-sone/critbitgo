@@ -8,6 +8,9 @@ import (
 	"io"
 	"os"
 	"strconv"
+	"unsafe"
+
+	"github.com/k-sone/slabgo"
 )
 
 var (
@@ -81,8 +84,10 @@ func (n *internal) direction(key []byte) int {
 
 // Crit-bit Tree
 type Trie struct {
-	root node
 	size int
+	root node
+	inc  *slabgo.Cache
+	exc  *slabgo.Cache
 }
 
 // searching the tree.
@@ -118,10 +123,7 @@ func (t *Trie) insert(key []byte, value interface{}, replace bool) error {
 
 	// an empty tree
 	if t.size == 0 {
-		t.root.external = &external{
-			key:   key,
-			value: value,
-		}
+		t.root.external = newExternal(t, key, value)
 		t.size = 1
 		return nil
 	}
@@ -139,16 +141,9 @@ func (t *Trie) insert(key []byte, value interface{}, replace bool) error {
 	}
 
 	// allocate new node
-	newNode := &internal{
-		offset: newOffset,
-		bit:    newBit,
-	}
+	newNode := newInternal(t, newOffset, newBit)
 	direction := newNode.direction(key)
-//	newNode.child[direction].internal = nil
-	newNode.child[direction].external = &external{
-		key:   key,
-		value: value,
-	}
+	newNode.child[direction].external = newExternal(t, key, value)
 
 	// insert new node
 	wherep := &t.root
@@ -205,11 +200,17 @@ func (t *Trie) Delete(key []byte) bool {
 
 	// removing the node
 	if whereq == nil {
+		ex := wherep.external
 		wherep.external = nil
+		freeExternal(t, ex)
 	} else {
-		othern := whereq.internal.child[1-direction]
+		in := whereq.internal
+		ex := wherep.external
+		othern := in.child[1-direction]
 		whereq.internal = othern.internal
 		whereq.external = othern.external
+		freeExternal(t, ex)
+		freeInternal(t, in)
 	}
 	t.size -= 1
 	return true
@@ -219,6 +220,8 @@ func (t *Trie) Delete(key []byte) bool {
 func (t *Trie) Clear() {
 	t.root.internal = nil
 	t.root.external = nil
+	t.inc.Destroy()
+	t.exc.Destroy()
 	t.size = 0
 }
 
@@ -316,9 +319,62 @@ func key2str(key []byte) string {
 	return string(key)
 }
 
+func newInternal(t *Trie, offset int, bit byte) *internal {
+	in := t.inc.Alloc().(*internal)
+	in.offset = offset
+	in.bit = bit
+	return in
+}
+
+func newExternal(t *Trie, key []byte, value interface{}) *external {
+	ex := t.exc.Alloc().(*external)
+	ex.key = key
+	ex.value = value
+	return ex
+}
+
+func freeInternal(t *Trie, in *internal) {
+	for _, n := range in.child {
+		n.internal = nil
+		n.external = nil
+	}
+	t.inc.FreePtr(unsafe.Pointer(in))
+}
+
+func freeExternal(t *Trie, ex *external) {
+	ex.key = nil
+	ex.value = nil
+	t.exc.FreePtr(unsafe.Pointer(ex))
+}
+
 // create a tree.
 func NewTrie() *Trie {
-	return &Trie{}
+	return NewTrieWithCapacity(0)
+}
+
+// create a tree with the specified initial capacity.
+func NewTrieWithCapacity(c int) *Trie {
+	var in internal
+	var ex external
+
+	m := (c + 255) >> 8
+	opts := slabgo.CacheOptions{
+		ObjLen: 256,
+		Grower: func(s *slabgo.CacheStats) int {
+			if m > 0 && m < s.TotalSlabs {
+				return m - s.TotalSlabs
+			}
+			return slabgo.DefaultGrower(s)
+		},
+		Reaper: func(s *slabgo.CacheStats) int {
+			return s.TotalSlabs - s.InuseSlabs - m
+		},
+	}
+
+	return &Trie{
+		inc: slabgo.NewCache(in, opts),
+		exc: slabgo.NewCache(ex, opts),
+	}
 }
 
 func init() {

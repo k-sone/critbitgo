@@ -52,6 +52,11 @@ func NewSortedMap() *SortedMap {
 	return &SortedMap{NewTrie()}
 }
 
+// Create a SortedMap with the specified inital capacity.
+func NewSortedMapWithCapacity(c int) *SortedMap {
+	return &SortedMap{NewTrieWithCapacity(c)}
+}
+
 func mapStrToKey(s string) []byte {
 	// avoid a KeyTailNull
 	if l := len(s); l > 0 {

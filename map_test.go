@@ -8,7 +8,7 @@ import (
 )
 
 func buildSortedMap(keys []string) *critbitgo.SortedMap {
-	m := critbitgo.NewSortedMap()
+	m := critbitgo.NewSortedMapWithCapacity(len(keys))
 	for _, key := range keys {
 		m.Set(key, key)
 	}

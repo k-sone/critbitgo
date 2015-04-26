@@ -30,7 +30,7 @@ func genRoute(rand *rand.Rand) string {
 }
 
 func buildNet(keys []string) *critbitgo.Net {
-	tree := critbitgo.NewNet()
+	tree := critbitgo.NewNetWithCapacity(len(keys))
 	for i := 0; i < len(keys); i++ {
 		tree.AddCIDR(keys[i], nil)
 	}

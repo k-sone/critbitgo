@@ -119,6 +119,11 @@ func NewNet() *Net {
 	return &Net{NewTrie()}
 }
 
+// Create IP routing table with the specified initial capacity.
+func NewNetWithCapacity(c int) *Net {
+	return &Net{NewTrieWithCapacity(c)}
+}
+
 func netCidrToKey(s string) ([]byte, error) {
 	_, ipnet, err := net.ParseCIDR(s)
 	if err != nil {
