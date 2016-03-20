@@ -184,3 +184,35 @@ func TestAllprefixed(t *testing.T) {
 		}
 	}
 }
+
+func TestKeyContainsZeroValue(t *testing.T) {
+	trie := critbitgo.NewTrie()
+	trie.Insert([]byte{1, 0, 1}, nil)
+	trie.Insert([]byte{1}, nil)
+	trie.Insert([]byte{0, 1, 1}, nil)
+	trie.Insert([]byte{}, nil)
+	trie.Insert([]byte{0, 0, 1}, nil)
+	trie.Insert([]byte{1, 1}, nil)
+	trie.Insert([]byte{1, 1, 1}, nil)
+	trie.Insert([]byte{0, 1}, nil)
+
+	var index int
+	exp := [][]byte{
+		[]byte{},
+		[]byte{0, 0, 1},
+		[]byte{0, 1},
+		[]byte{0, 1, 1},
+		[]byte{1},
+		[]byte{1, 0, 1},
+		[]byte{1, 1},
+		[]byte{1, 1, 1},
+	}
+	handle := func(key []byte, _ interface{}) bool {
+		if !bytes.Equal(exp[index], key) {
+			t.Errorf("Key Order - index=%d, expected [%x], actula [%x]", index, exp[index], key)
+		}
+		index += 1
+		return true
+	}
+	trie.Allprefixed([]byte(""), handle)
+}

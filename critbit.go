@@ -36,6 +36,7 @@ type internal struct {
 	child  [2]node
 	offset int
 	bit    byte
+	cont   bool // if true, key of child[1] contains key of child[0]
 }
 
 type external struct {
@@ -44,7 +45,7 @@ type external struct {
 }
 
 // finding the critical bit.
-func (n *external) criticalBit(key []byte) (offset int, bit byte) {
+func (n *external) criticalBit(key []byte) (offset int, bit byte, cont bool) {
 	nlen := len(n.key)
 	klen := len(key)
 	mlen := nlen
@@ -68,12 +69,12 @@ func (n *external) criticalBit(key []byte) (offset int, bit byte) {
 		// two keys are equal
 		offset = -1
 	}
-	return
+	return offset, bit, true
 }
 
 // calculate direction.
 func (n *internal) direction(key []byte) int {
-	if n.offset < len(key) && key[n.offset]&n.bit != 0 {
+	if n.offset < len(key) && (key[n.offset]&n.bit != 0 || n.cont) {
 		return 1
 	}
 	return 0
@@ -127,7 +128,7 @@ func (t *Trie) insert(key []byte, value interface{}, replace bool) error {
 	}
 
 	n := t.search(key)
-	newOffset, newBit := n.external.criticalBit(key)
+	newOffset, newBit, newCont := n.external.criticalBit(key)
 
 	// already exists in the tree
 	if newOffset == -1 {
@@ -142,6 +143,7 @@ func (t *Trie) insert(key []byte, value interface{}, replace bool) error {
 	newNode := &internal{
 		offset: newOffset,
 		bit:    newBit,
+		cont:   newCont,
 	}
 	direction := newNode.direction(key)
 //	newNode.child[direction].internal = nil
@@ -288,7 +290,7 @@ func dump(w io.Writer, n *node, right bool, prefix string) {
 	}
 
 	if in := n.internal; in != nil {
-		fmt.Fprintf(w, "%s-- off=%d, bit=%08b (%02x)\n", ownprefix, in.offset, in.bit, in.bit)
+		fmt.Fprintf(w, "%s-- off=%d, bit=%08b(%02x), cont=%v\n", ownprefix, in.offset, in.bit, in.bit, in.cont)
 		for i := 0; i < 2; i++ {
 			var nextprefix string
 			switch i {
