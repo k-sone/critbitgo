@@ -35,12 +35,12 @@ func TestSortedMapGet(t *testing.T) {
 	m := buildSortedMap(keys)
 
 	for _, key := range keys {
-		if value := m.Get(key); value != key {
+		if value, ok := m.Get(key); !ok || value != key {
 			t.Error("Get() - not found - [%s]", key)
 		}
 	}
 
-	if value := m.Get("aaa"); value != nil {
+	if value, ok := m.Get("aaa"); ok || value != nil {
 		t.Error("Get() - phantom found")
 	}
 }
@@ -53,13 +53,13 @@ func TestSortedMapDelete(t *testing.T) {
 		if !m.Contains(key) {
 			t.Error("Delete() - not exists - [%s]", key)
 		}
-		if !m.Delete(key) {
+		if value, ok := m.Delete(key); !ok || value != key {
 			t.Error("Delete() - failed - [%s]", key)
 		}
 		if m.Contains(key) {
 			t.Error("Delete() - exists - [%s]", key)
 		}
-		if m.Delete(key) {
+		if value, ok := m.Delete(key); ok || value != nil {
 			t.Error("Delete() - phantom found - [%s]", key)
 		}
 		if i != len(keys) {

@@ -11,7 +11,7 @@ import (
 func buildTrie(t *testing.T, keys []string) *critbitgo.Trie {
 	trie := critbitgo.NewTrie()
 	for _, key := range keys {
-		if err := trie.Insert([]byte(key), key); err != nil {
+		if !trie.Insert([]byte(key), key) {
 			t.Errorf("Insert() - failed insert \"%s\"\n%s", key, dumpTrie(trie))
 		}
 	}
@@ -47,11 +47,11 @@ func TestInsert(t *testing.T) {
 	}
 
 	// error check
-	if err := trie.Insert([]byte("a"), nil); err != critbitgo.KeyExists {
+	if trie.Insert([]byte("a"), nil) {
 		t.Error("Insert() - check exists")
 	}
-	if err := trie.Insert([]byte{0}, nil); err != critbitgo.KeyTailNull {
-		t.Error("Insert() - check null termination")
+	if !trie.Insert([]byte("c"), nil) {
+		t.Error("Insert() - check not exists")
 	}
 }
 
@@ -59,8 +59,10 @@ func TestSet(t *testing.T) {
 	keys := []string{"", "a", "aa", "b", "bb", "ab", "ba", "aba", "bab"}
 	trie := buildTrie(t, keys)
 
-	if err := trie.Set([]byte("a"), 0); err != nil {
-		t.Errorf("Set() - failed replace - %s", err)
+	trie.Set([]byte("a"), 100)
+	v, _ := trie.Get([]byte("a"))
+	if n, ok := v.(int); !ok || n != 100 {
+		t.Errorf("Set() - failed replace - %v", v)
 	}
 }
 
@@ -84,12 +86,12 @@ func TestGet(t *testing.T) {
 	trie := buildTrie(t, keys)
 
 	for _, key := range keys {
-		if value := trie.Get([]byte(key)); value != key {
+		if value, ok := trie.Get([]byte(key)); value != key || !ok {
 			t.Error("Get() - not found - %s", key)
 		}
 	}
 
-	if value := trie.Get([]byte("aaa")); value != nil {
+	if value, ok := trie.Get([]byte("aaa")); value != nil || ok {
 		t.Error("Get() - phantom found")
 	}
 }
@@ -102,7 +104,7 @@ func TestDelete(t *testing.T) {
 		if !trie.Contains([]byte(key)) {
 			t.Error("Delete() - not exists - %s", key)
 		}
-		if !trie.Delete([]byte(key)) {
+		if v, ok := trie.Delete([]byte(key)); !ok || v != key {
 			t.Error("Delete() - failed - %s", key)
 		}
 		if trie.Contains([]byte(key)) {
@@ -195,12 +197,20 @@ func TestKeyContainsZeroValue(t *testing.T) {
 	trie.Insert([]byte{1, 1}, nil)
 	trie.Insert([]byte{1, 1, 1}, nil)
 	trie.Insert([]byte{0, 1}, nil)
+	trie.Insert([]byte{0, 1, 0}, nil)
+	trie.Insert([]byte{0, 0}, nil)
+	trie.Insert([]byte{0, 0, 0}, nil)
+	trie.Insert([]byte{0}, nil)
 
 	var index int
 	exp := [][]byte{
 		[]byte{},
+		[]byte{0},
+		[]byte{0, 0},
+		[]byte{0, 0, 0},
 		[]byte{0, 0, 1},
 		[]byte{0, 1},
+		[]byte{0, 1, 0},
 		[]byte{0, 1, 1},
 		[]byte{1},
 		[]byte{1, 0, 1},

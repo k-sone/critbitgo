@@ -13,15 +13,15 @@ func (m *SortedMap) Contains(key string) bool {
 	return m.trie.Contains(*(*[]byte)(unsafe.Pointer(&key)))
 }
 
-func (m *SortedMap) Get(key string) (value interface{}) {
+func (m *SortedMap) Get(key string) (value interface{}, ok bool) {
 	return m.trie.Get(*(*[]byte)(unsafe.Pointer(&key)))
 }
 
-func (m *SortedMap) Set(key string, value interface{}) error {
-	return m.trie.Set([]byte(key), value)
+func (m *SortedMap) Set(key string, value interface{}) {
+	m.trie.Set([]byte(key), value)
 }
 
-func (m *SortedMap) Delete(key string) bool {
+func (m *SortedMap) Delete(key string) (value interface{}, ok bool) {
 	return m.trie.Delete(*(*[]byte)(unsafe.Pointer(&key)))
 }
 

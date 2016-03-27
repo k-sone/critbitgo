@@ -9,56 +9,106 @@ type Net struct {
 	trie *Trie
 }
 
-// Associates value with `s`.
-// If `s` is not CIDR notation, returns an error.
-func (n *Net) AddCIDR(s string, value interface{}) error {
-	key, err := netCidrToKey(s)
-	if err != nil {
-		return err
-	}
-	return n.trie.Set(key, value)
+// Add a route.
+func (n *Net) Add(r *net.IPNet, value interface{}) {
+	n.trie.Set(netIPNetToKey(r), value)
 }
 
-// Deletes the mapping for `s`.
-// If `s` is not CIDR notation or the mapping is not found, return false.
-func (n *Net) DeleteCIDR(s string) bool {
-	key, err := netCidrToKey(s)
-	if err != nil {
-		return false
-	}
-	return n.trie.Delete(key)
-}
-
-// Returns the value to which `s` is mapped.
+// Add a route.
 // If `s` is not CIDR notation, returns an error.
-func (n *Net) GetCIDR(s string) (value interface{}, err error) {
-	key, err := netCidrToKey(s)
-	if err == nil {
-		if node := n.trie.search(key); node.external != nil {
-			value = node.external.value
-		}
+func (n *Net) AddCIDR(s string, value interface{}) (err error) {
+	var r *net.IPNet
+	if _, r, err = net.ParseCIDR(s); err == nil {
+		n.Add(r, value)
 	}
 	return
 }
 
-// Returns the value by using the longest prefix matching.
-// If `s` is not CIDR notation, returns an error.
-func (n *Net) MatchCIDR(s string) (cidr string, value interface{}, err error) {
-	key, err := netCidrToKey(s)
-	if err != nil || n.trie.size == 0 {
+// Delete a specific route.
+// If a route is not found, `ok` is false.
+func (n *Net) Delete(r *net.IPNet) (value interface{}, ok bool) {
+	return n.trie.Delete(netIPNetToKey(r))
+}
+
+// Delete a specific route.
+// If `s` is not CIDR notation or a route is not found, `ok` is false.
+func (n *Net) DeleteCIDR(s string) (value interface{}, ok bool, err error) {
+	var r *net.IPNet
+	if _, r, err = net.ParseCIDR(s); err == nil {
+		value, ok = n.Delete(r)
+	}
+	return
+}
+
+// Get a specific route.
+// If a route is not found, `ok` is false.
+func (n *Net) Get(r *net.IPNet) (value interface{}, ok bool) {
+	return n.trie.Get(netIPNetToKey(r))
+}
+
+// Get a specific route.
+// If `s` is not CIDR notation or a route is not found, `ok` is false.
+func (n *Net) GetCIDR(s string) (value interface{}, ok bool, err error) {
+	var r *net.IPNet
+	if _, r, err = net.ParseCIDR(s); err == nil {
+		value, ok = n.Get(r)
+	}
+	return
+}
+
+// Return a specific route by using the longest prefix matching.
+// If a route is not found, `route` is nil.
+func (n *Net) Match(r *net.IPNet) (route *net.IPNet, value interface{}) {
+	if k, v := n.match(netIPNetToKey(r)); k != nil {
+		route = netKeyToIPNet(k)
+		value = v
+	}
+	return
+}
+
+// Return a specific route by using the longest prefix matching.
+// If `s` is not CIDR notation, or a route is not found, `route` is nil.
+func (n *Net) MatchCIDR(s string) (route *net.IPNet, value interface{}, err error) {
+	var r *net.IPNet
+	if _, r, err = net.ParseCIDR(s); err == nil {
+		route, value = n.Match(r)
+	}
+	return
+}
+
+// Return a specific route by using the longest prefix matching.
+// If `ip` is invalid IP, or a route is not found, `route` is nil.
+func (n *Net) MatchIP(ip net.IP) (route *net.IPNet, value interface{}, err error) {
+	var key []byte
+	if v4 := ip.To4(); v4 != nil {
+		key = append(v4, 32)
+	} else if ip.To16() != nil {
+		key = append(ip, 128)
+	} else {
+		err = &net.AddrError{Err: "invalid IP address", Addr: ip.String()}
 		return
 	}
-	if node := match(&n.trie.root, key, false); node != nil {
-		cidr = netKeyToCidr(node.external.key)
-		value = node.external.value
+
+	if k, v := n.match(key); k != nil {
+		route = netKeyToIPNet(k)
+		value = v
 	}
 	return
 }
 
-func match(p *node, key []byte, backtracking bool) *node {
+func (n *Net) match(key []byte) ([]byte, interface{}) {
+	if n.trie.size > 0 {
+		if node := lookup(&n.trie.root, key, false); node != nil {
+			return node.external.key, node.external.value
+		}
+	}
+	return nil, nil
+}
+
+func lookup(p *node, key []byte, backtracking bool) *node {
 	if p.internal != nil {
 		var direction int
-		if p.internal.offset == len(key)-2 {
+		if p.internal.offset == len(key)-1 {
 			// selecting the larger side when comparing the mask
 			direction = 1
 		} else if backtracking {
@@ -67,12 +117,12 @@ func match(p *node, key []byte, backtracking bool) *node {
 			direction = p.internal.direction(key)
 		}
 
-		if c := match(&p.internal.child[direction], key, backtracking); c != nil {
+		if c := lookup(&p.internal.child[direction], key, backtracking); c != nil {
 			return c
 		}
 		if direction == 1 {
 			// search other node
-			return match(&p.internal.child[0], key, true)
+			return lookup(&p.internal.child[0], key, true)
 		}
 		return nil
 	} else {
@@ -82,8 +132,8 @@ func match(p *node, key []byte, backtracking bool) *node {
 		}
 
 		// check mask
-		mask := p.external.key[nlen-2]
-		if mask > key[nlen-2] {
+		mask := p.external.key[nlen-1]
+		if mask > key[nlen-1] {
 			return nil
 		}
 
@@ -104,12 +154,12 @@ func match(p *node, key []byte, backtracking bool) *node {
 	}
 }
 
-// Deletes all mappings
+// Deletes all routes.
 func (n *Net) Clear() {
 	n.trie.Clear()
 }
 
-// Returns number of mappings
+// Returns number of routes.
 func (n *Net) Size() int {
 	return n.trie.Size()
 }
@@ -119,23 +169,18 @@ func NewNet() *Net {
 	return &Net{NewTrie()}
 }
 
-func netCidrToKey(s string) ([]byte, error) {
-	_, ipnet, err := net.ParseCIDR(s)
-	if err != nil {
-		return nil, err
-	}
-	ones, _ := ipnet.Mask.Size()
-	// +--------------+------+--------------+
-	// | ip address.. | mask | termination  |
-	// +--------------+------+--------------+
-	return append(append(ipnet.IP, byte(ones)), 0xff), nil
+func netIPNetToKey(n *net.IPNet) []byte {
+	// +--------------+------+
+	// | ip address.. | mask |
+	// +--------------+------+
+	ones, _ := n.Mask.Size()
+	return append(n.IP, byte(ones))
 }
 
-func netKeyToCidr(k []byte) string {
-	iplen := len(k) - 2
-	ipnet := &net.IPNet{
+func netKeyToIPNet(k []byte) *net.IPNet {
+	iplen := len(k) - 1
+	return &net.IPNet{
 		IP:   net.IP(k[:iplen]),
 		Mask: net.CIDRMask(int(k[iplen]), iplen*8),
 	}
-	return ipnet.String()
 }
