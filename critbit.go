@@ -3,19 +3,14 @@ package critbitgo
 import (
 	"bytes"
 	"encoding/hex"
-	"errors"
 	"fmt"
 	"io"
 	"os"
 	"strconv"
 )
 
-var (
-	msbMatrix [256]byte // The matrix of most significant bit
-
-	KeyExists   error = errors.New("A key already exists")
-	KeyTailNull error = errors.New("Can't use a key with the NULL termination")
-)
+// The matrix of most significant bit
+var msbMatrix [256]byte
 
 func buildMsbMatrix() {
 	for i := 0; i < len(msbMatrix); i++ {
@@ -104,19 +99,16 @@ func (t *Trie) Contains(key []byte) bool {
 }
 
 // get member.
-func (t *Trie) Get(key []byte) (value interface{}) {
+// if `key` is in Trie, `ok` is true.
+func (t *Trie) Get(key []byte) (value interface{}, ok bool) {
 	if n := t.search(key); n.external != nil && bytes.Equal(n.external.key, key) {
-		value = n.external.value
+		return n.external.value, true
 	}
 	return
 }
 
 // insert into the tree (replaceable).
-func (t *Trie) insert(key []byte, value interface{}, replace bool) error {
-	if klen := len(key); klen > 0 && key[klen-1] == 0 {
-		return KeyTailNull
-	}
-
+func (t *Trie) insert(key []byte, value interface{}, replace bool) bool {
 	// an empty tree
 	if t.size == 0 {
 		t.root.external = &external{
@@ -124,7 +116,7 @@ func (t *Trie) insert(key []byte, value interface{}, replace bool) error {
 			value: value,
 		}
 		t.size = 1
-		return nil
+		return true
 	}
 
 	n := t.search(key)
@@ -134,9 +126,9 @@ func (t *Trie) insert(key []byte, value interface{}, replace bool) error {
 	if newOffset == -1 {
 		if replace {
 			n.external.value = value
-			return nil
+			return true
 		}
-		return KeyExists
+		return false
 	}
 
 	// allocate new node
@@ -146,7 +138,6 @@ func (t *Trie) insert(key []byte, value interface{}, replace bool) error {
 		cont:   newCont,
 	}
 	direction := newNode.direction(key)
-//	newNode.child[direction].internal = nil
 	newNode.child[direction].external = &external{
 		key:   key,
 		value: value,
@@ -169,24 +160,26 @@ func (t *Trie) insert(key []byte, value interface{}, replace bool) error {
 	}
 	wherep.internal = newNode
 	t.size += 1
-	return nil
+	return true
 }
 
 // insert into the tree.
-func (t *Trie) Insert(key []byte, value interface{}) error {
+// if `key` is alredy in Trie, return false.
+func (t *Trie) Insert(key []byte, value interface{}) bool {
 	return t.insert(key, value, false)
 }
 
 // set into the tree.
-func (t *Trie) Set(key []byte, value interface{}) error {
-	return t.insert(key, value, true)
+func (t *Trie) Set(key []byte, value interface{}) {
+	t.insert(key, value, true)
 }
 
 // deleting elements.
-func (t *Trie) Delete(key []byte) bool {
+// if `key` is in Trie, `ok` is true.
+func (t *Trie) Delete(key []byte) (value interface{}, ok bool) {
 	// an empty tree
 	if t.size == 0 {
-		return false
+		return
 	}
 
 	var direction int
@@ -202,8 +195,10 @@ func (t *Trie) Delete(key []byte) bool {
 
 	// checking that we have the right element
 	if !bytes.Equal(wherep.external.key, key) {
-		return false
+		return
 	}
+	value = wherep.external.value
+	ok = true
 
 	// removing the node
 	if whereq == nil {
@@ -214,7 +209,7 @@ func (t *Trie) Delete(key []byte) bool {
 		whereq.external = othern.external
 	}
 	t.size -= 1
-	return true
+	return
 }
 
 // clearing a tree.

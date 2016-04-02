@@ -68,7 +68,7 @@ func BenchmarkSortedMapGet(b *testing.B) {
 
 	for i := 0; i < b.N; i++ {
 		k := keys[random.Intn(keyCount)]
-		_ = m.Get(k)
+		_, _ = m.Get(k)
 	}
 }
 

@@ -1,17 +1,66 @@
 package critbitgo_test
 
 import (
+	"net"
 	"testing"
 
 	"github.com/k-sone/critbitgo"
 )
 
+func TestNet(t *testing.T) {
+	trie := critbitgo.NewNet()
+	cidr := "192.168.1.0/24"
+	host := "192.168.1.1/32"
+	hostIP := net.IPv4(192, 168, 1, 1)
+
+	if _, _, err := trie.GetCIDR(""); err == nil {
+		t.Error("GetCIDR() - not error")
+	}
+	if v, ok, err := trie.GetCIDR(cidr); v != nil || ok || err != nil {
+		t.Errorf("GetCIDR() - phantom: %v, %v, %v", v, ok, err)
+	}
+	if _, _, err := trie.MatchCIDR(""); err == nil {
+		t.Error("MatchCIDR() - not error")
+	}
+	if r, v, err := trie.MatchCIDR(host); r != nil || v != nil || err != nil {
+		t.Errorf("MatchCIDR() - phantom: %v, %v, %v", r, v, err)
+	}
+	if _, _, err := trie.MatchIP(net.IP([]byte{})); err == nil {
+		t.Error("MatchIP() - not error")
+	}
+	if r, v, err := trie.MatchIP(hostIP); r != nil || v != nil || err != nil {
+		t.Errorf("MatchIP() - phantom: %v, %v, %v", r, v, err)
+	}
+	if _, _, err := trie.DeleteCIDR(""); err == nil {
+		t.Error("DeleteCIDR() - not error")
+	}
+	if v, ok, err := trie.DeleteCIDR(cidr); v != nil || ok || err != nil {
+		t.Errorf("DeleteCIDR() - phantom: %v, %v, %v", v, ok, err)
+	}
+
+	if err := trie.AddCIDR(cidr, &cidr); err != nil {
+		t.Errorf("AddCIDR() - %s: error occurred %s", cidr, err)
+	}
+	if v, ok, err := trie.GetCIDR(cidr); v != &cidr || !ok || err != nil {
+		t.Errorf("GetCIDR() - failed: %v, %v, %v", v, ok, err)
+	}
+	if r, v, err := trie.MatchCIDR(host); r == nil || r.String() != cidr || v != &cidr || err != nil {
+		t.Errorf("MatchCIDR() - failed: %v, %v, %v", r, v, err)
+	}
+	if r, v, err := trie.MatchIP(hostIP); r == nil || r.String() != cidr || v != &cidr || err != nil {
+		t.Errorf("MatchIP() - failed: %v, %v, %v", r, v, err)
+	}
+	if v, ok, err := trie.DeleteCIDR(cidr); v != &cidr || !ok || err != nil {
+		t.Errorf("DeleteCIDR() - failed: %v, %v, %v", v, ok, err)
+	}
+}
+
 func checkMatch(t *testing.T, trie *critbitgo.Net, request, expect string) {
-	cidr, value, err := trie.MatchCIDR(request)
+	route, value, err := trie.MatchCIDR(request)
 	if err != nil {
 		t.Errorf("MatchCIDR() - %s: error occurred %s", request, err)
 	}
-	if expect != cidr {
+	if cidr := route.String(); expect != cidr {
 		t.Errorf("MatchCIDR() - %s: expected [%s], actual [%s]", request, expect, cidr)
 	}
 	if value == nil {
