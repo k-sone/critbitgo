@@ -4,14 +4,24 @@ import (
 	"net"
 )
 
+var (
+	mask32  = net.IPMask{0xff, 0xff, 0xff, 0xff}
+	mask128 = net.IPMask{0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff}
+)
+
 // IP routing table.
 type Net struct {
 	trie *Trie
 }
 
 // Add a route.
-func (n *Net) Add(r *net.IPNet, value interface{}) {
-	n.trie.Set(netIPNetToKey(r), value)
+// If `r` is not IPv4/IPv6 network, returns an error.
+func (n *Net) Add(r *net.IPNet, value interface{}) (err error) {
+	var ip net.IP
+	if ip, _, err = netValidateIPNet(r); err == nil {
+		n.trie.Set(netIPNetToKey(ip, r.Mask), value)
+	}
+	return
 }
 
 // Add a route.
@@ -25,9 +35,13 @@ func (n *Net) AddCIDR(s string, value interface{}) (err error) {
 }
 
 // Delete a specific route.
-// If a route is not found, `ok` is false.
-func (n *Net) Delete(r *net.IPNet) (value interface{}, ok bool) {
-	return n.trie.Delete(netIPNetToKey(r))
+// If `r` is not IP4/IPv6 network or a route is not found, `ok` is false.
+func (n *Net) Delete(r *net.IPNet) (value interface{}, ok bool, err error) {
+	var ip net.IP
+	if ip, _, err = netValidateIPNet(r); err == nil {
+		value, ok = n.trie.Delete(netIPNetToKey(ip, r.Mask))
+	}
+	return
 }
 
 // Delete a specific route.
@@ -35,15 +49,19 @@ func (n *Net) Delete(r *net.IPNet) (value interface{}, ok bool) {
 func (n *Net) DeleteCIDR(s string) (value interface{}, ok bool, err error) {
 	var r *net.IPNet
 	if _, r, err = net.ParseCIDR(s); err == nil {
-		value, ok = n.Delete(r)
+		value, ok, err = n.Delete(r)
 	}
 	return
 }
 
 // Get a specific route.
-// If a route is not found, `ok` is false.
-func (n *Net) Get(r *net.IPNet) (value interface{}, ok bool) {
-	return n.trie.Get(netIPNetToKey(r))
+// If `r` is not IPv4/IPv6 network or a route is not found, `ok` is false.
+func (n *Net) Get(r *net.IPNet) (value interface{}, ok bool, err error) {
+	var ip net.IP
+	if ip, _, err = netValidateIPNet(r); err == nil {
+		value, ok = n.trie.Get(netIPNetToKey(ip, r.Mask))
+	}
+	return
 }
 
 // Get a specific route.
@@ -51,17 +69,20 @@ func (n *Net) Get(r *net.IPNet) (value interface{}, ok bool) {
 func (n *Net) GetCIDR(s string) (value interface{}, ok bool, err error) {
 	var r *net.IPNet
 	if _, r, err = net.ParseCIDR(s); err == nil {
-		value, ok = n.Get(r)
+		value, ok, err = n.Get(r)
 	}
 	return
 }
 
 // Return a specific route by using the longest prefix matching.
-// If a route is not found, `route` is nil.
-func (n *Net) Match(r *net.IPNet) (route *net.IPNet, value interface{}) {
-	if k, v := n.match(netIPNetToKey(r)); k != nil {
-		route = netKeyToIPNet(k)
-		value = v
+// If `r` is not IPv4/IPv6 network or a route is not found, `route` is nil.
+func (n *Net) Match(r *net.IPNet) (route *net.IPNet, value interface{}, err error) {
+	var ip net.IP
+	if ip, _, err = netValidateIP(r.IP); err == nil {
+		if k, v := n.match(netIPNetToKey(ip, r.Mask)); k != nil {
+			route = netKeyToIPNet(k)
+			value = v
+		}
 	}
 	return
 }
@@ -71,7 +92,7 @@ func (n *Net) Match(r *net.IPNet) (route *net.IPNet, value interface{}) {
 func (n *Net) MatchCIDR(s string) (route *net.IPNet, value interface{}, err error) {
 	var r *net.IPNet
 	if _, r, err = net.ParseCIDR(s); err == nil {
-		route, value = n.Match(r)
+		route, value, err = n.Match(r)
 	}
 	return
 }
@@ -79,17 +100,18 @@ func (n *Net) MatchCIDR(s string) (route *net.IPNet, value interface{}, err erro
 // Return a specific route by using the longest prefix matching.
 // If `ip` is invalid IP, or a route is not found, `route` is nil.
 func (n *Net) MatchIP(ip net.IP) (route *net.IPNet, value interface{}, err error) {
-	var key []byte
-	if v4 := ip.To4(); v4 != nil {
-		key = append(v4, 32)
-	} else if ip.To16() != nil {
-		key = append(ip, 128)
-	} else {
-		err = &net.AddrError{Err: "invalid IP address", Addr: ip.String()}
+	var isV4 bool
+	ip, isV4, err = netValidateIP(ip)
+	if err != nil {
 		return
 	}
-
-	if k, v := n.match(key); k != nil {
+	var mask net.IPMask
+	if isV4 {
+		mask = mask32
+	} else {
+		mask = mask128
+	}
+	if k, v := n.match(netIPNetToKey(ip, mask)); k != nil {
 		route = netKeyToIPNet(k)
 		value = v
 	}
@@ -169,12 +191,32 @@ func NewNet() *Net {
 	return &Net{NewTrie()}
 }
 
-func netIPNetToKey(n *net.IPNet) []byte {
+func netValidateIP(ip net.IP) (nIP net.IP, isV4 bool, err error) {
+	if v4 := ip.To4(); v4 != nil {
+		nIP = v4
+		isV4 = true
+	} else if ip.To16() != nil {
+		nIP = ip
+	} else {
+		err = &net.AddrError{Err: "Invalid IP address", Addr: ip.String()}
+	}
+	return
+}
+
+func netValidateIPNet(r *net.IPNet) (nIP net.IP, isV4 bool, err error) {
+	if r == nil {
+		err = &net.AddrError{Err: "IP network is nil"}
+		return
+	}
+	return netValidateIP(r.IP)
+}
+
+func netIPNetToKey(ip net.IP, mask net.IPMask) []byte {
 	// +--------------+------+
 	// | ip address.. | mask |
 	// +--------------+------+
-	ones, _ := n.Mask.Size()
-	return append(n.IP, byte(ones))
+	ones, _ := mask.Size()
+	return append(ip, byte(ones))
 }
 
 func netKeyToIPNet(k []byte) *net.IPNet {
