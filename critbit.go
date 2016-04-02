@@ -138,7 +138,6 @@ func (t *Trie) insert(key []byte, value interface{}, replace bool) bool {
 		cont:   newCont,
 	}
 	direction := newNode.direction(key)
-//	newNode.child[direction].internal = nil
 	newNode.child[direction].external = &external{
 		key:   key,
 		value: value,
