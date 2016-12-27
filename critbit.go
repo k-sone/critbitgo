@@ -265,6 +265,33 @@ func allprefixed(n *node, handle func([]byte, interface{}) bool) bool {
 	return true
 }
 
+// Search for the longest matching key from the beginning of the given key.
+// if `key` is in Trie, `ok` is true.
+func (t *Trie) LongestPrefix(given []byte) (key []byte, value interface{}, ok bool) {
+	// an empty tree
+	if t.size == 0 {
+		return
+	}
+	return longestPrefix(&t.root, given)
+}
+
+func longestPrefix(n *node, key []byte) ([]byte, interface{}, bool) {
+	if n.internal != nil {
+		direction := n.internal.direction(key)
+		if k, v, ok := longestPrefix(&n.internal.child[direction], key); ok {
+			return k, v, ok
+		}
+		if direction == 1 {
+			return longestPrefix(&n.internal.child[0], key)
+		}
+	} else {
+		if bytes.HasPrefix(key, n.external.key) {
+			return n.external.key, n.external.value, true
+		}
+	}
+	return nil, nil, false
+}
+
 // dump tree. (for debugging)
 func (t *Trie) Dump(w io.Writer) {
 	if t.root.internal == nil && t.root.external == nil {

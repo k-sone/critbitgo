@@ -195,6 +195,36 @@ func TestAllprefixed(t *testing.T) {
 	}
 }
 
+func TestLongestPrefix(t *testing.T) {
+	keys := []string{"a", "aa", "b", "bb", "ab", "ba", "aba", "bab"}
+	trie := buildTrie(t, keys)
+
+	expects := map[string]string{
+		"a":   "a",
+		"a^":  "a",
+		"aaa": "aa",
+		"abc": "ab",
+		"bac": "ba",
+		"bbb": "bb",
+		"bc":  "b",
+	}
+	for g, k := range expects {
+		if key, value, ok := trie.LongestPrefix([]byte(g)); !ok || string(key) != k || value != k {
+			t.Errorf("LongestPrefix() - invalid result - %s not %s", key, g)
+		}
+	}
+
+	if _, _, ok := trie.LongestPrefix([]byte{}); ok {
+		t.Error("LongestPrefix() - invalid result - not empty")
+	}
+	if _, _, ok := trie.LongestPrefix([]byte("^")); ok {
+		t.Error("LongestPrefix() - invalid result - not empty")
+	}
+	if _, _, ok := trie.LongestPrefix([]byte("c")); ok {
+		t.Error("LongestPrefix() - invalid result - not empty")
+	}
+}
+
 func TestKeyContainsZeroValue(t *testing.T) {
 	trie := critbitgo.NewTrie()
 	trie.Insert([]byte{1, 0, 1}, nil)
