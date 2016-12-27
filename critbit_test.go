@@ -140,33 +140,43 @@ func TestAllprefixed(t *testing.T) {
 	keys := []string{"", "a", "aa", "b", "bb", "ab", "ba", "aba", "bab"}
 	trie := buildTrie(t, keys)
 
-	elems := make(map[string]interface{})
+	elems := make([]string, 0, len(keys))
 	handle := func(key []byte, value interface{}) bool {
-		elems[string(key)] = value
+		if k := string(key); k == value {
+			elems = append(elems, k)
+		}
 		return true
 	}
-	if !trie.Allprefixed([]byte(""), handle) {
+	if !trie.Allprefixed([]byte{}, handle) {
 		t.Error("Allprefixed() - invalid result")
 	}
-	for _, key := range keys {
-		if _, ok := elems[key]; !ok {
+	if len(elems) != 9 {
+		t.Errorf("Allprefixed() - invalid elems length [%v]", elems)
+	}
+	for i, key := range []string{"", "a", "aa", "ab", "aba", "b", "ba", "bab", "bb"} {
+		if key != elems[i] {
 			t.Errorf("Allprefixed() - not found [%s]", key)
 		}
 	}
 
-	elems = make(map[string]interface{})
+	elems = make([]string, 0, len(keys))
 	if !trie.Allprefixed([]byte("a"), handle) {
 		t.Error("Allprefixed() - invalid result")
 	}
-	for _, key := range []string{"a", "aa", "ab", "aba"} {
-		if _, ok := elems[key]; !ok {
+	if len(elems) != 4 {
+		t.Errorf("Allprefixed() - invalid elems length [%v]", elems)
+	}
+	for i, key := range []string{"a", "aa", "ab", "aba"} {
+		if key != elems[i] {
 			t.Errorf("Allprefixed() - not found [%s]", key)
 		}
 	}
 
-	elems = make(map[string]interface{})
+	elems = make([]string, 0, len(keys))
 	handle = func(key []byte, value interface{}) bool {
-		elems[string(key)] = value
+		if k := string(key); k == value {
+			elems = append(elems, k)
+		}
 		if string(key) == "aa" {
 			return false
 		}
@@ -175,14 +185,12 @@ func TestAllprefixed(t *testing.T) {
 	if trie.Allprefixed([]byte("a"), handle) {
 		t.Error("Allprefixed() - invalid result")
 	}
-	for _, key := range []string{"a", "aa"} {
-		if _, ok := elems[key]; !ok {
-			t.Errorf("Allprefixed() - not found [%s]", key)
-		}
+	if len(elems) != 2 {
+		t.Errorf("Allprefixed() - invalid elems length [%v]", elems)
 	}
-	for _, key := range []string{"ab", "aba"} {
-		if _, ok := elems[key]; ok {
-			t.Errorf("Allprefixed() - phantom found [%s]", key)
+	for i, key := range []string{"a", "aa"} {
+		if key != elems[i] {
+			t.Errorf("Allprefixed() - not found [%s]", key)
 		}
 	}
 }
