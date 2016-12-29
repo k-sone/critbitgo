@@ -292,6 +292,44 @@ func longestPrefix(n *node, key []byte) ([]byte, interface{}, bool) {
 	return nil, nil, false
 }
 
+// Iterating elements from a given start key.
+// handle is called with arguments key and value (if handle returns `false`, the iteration is aborted)
+func (t *Trie) Walk(start []byte, handle func(key []byte, value interface{}) bool) bool {
+	var seek bool
+	if start != nil {
+		seek = true
+	}
+	return walk(&t.root, start, &seek, handle)
+}
+
+func walk(n *node, key []byte, seek *bool, handle func([]byte, interface{}) bool) bool {
+	if n.internal != nil {
+		var direction int
+		if *seek {
+			direction = n.internal.direction(key)
+		}
+		if !walk(&n.internal.child[direction], key, seek, handle) {
+			return false
+		}
+		if !(*seek) && direction == 0 {
+			// iteration another side
+			return walk(&n.internal.child[1], key, seek, handle)
+		}
+		return true
+	} else {
+		if *seek {
+			if bytes.Equal(n.external.key, key) {
+				// seek completed
+				*seek = false
+			} else {
+				// key is not in Trie
+				return false
+			}
+		}
+		return handle(n.external.key, n.external.value)
+	}
+}
+
 // dump tree. (for debugging)
 func (t *Trie) Dump(w io.Writer) {
 	if t.root.internal == nil && t.root.external == nil {

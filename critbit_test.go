@@ -225,6 +225,88 @@ func TestLongestPrefix(t *testing.T) {
 	}
 }
 
+func TestWalk(t *testing.T) {
+	keys := []string{"", "a", "aa", "b", "bb", "ab", "ba", "aba", "bab"}
+	trie := buildTrie(t, keys)
+
+	elems := make([]string, 0, len(keys))
+	handle := func(key []byte, value interface{}) bool {
+		if k := string(key); k == value {
+			elems = append(elems, k)
+		}
+		return true
+	}
+	if !trie.Walk([]byte{}, handle) {
+		t.Error("Walk() - invalid result")
+	}
+	if len(elems) != 9 {
+		t.Errorf("Walk() - invalid elems length [%v]", elems)
+	}
+	for i, key := range []string{"", "a", "aa", "ab", "aba", "b", "ba", "bab", "bb"} {
+		if key != elems[i] {
+			t.Errorf("Walk() - not found [%s]", key)
+		}
+	}
+
+	elems = make([]string, 0, len(keys))
+	if !trie.Walk([]byte("ab"), handle) {
+		t.Error("Walk() - invalid result")
+	}
+	if len(elems) != 6 {
+		t.Errorf("Walk() - invalid elems length [%v]", elems)
+	}
+	for i, key := range []string{"ab", "aba", "b", "ba", "bab", "bb"} {
+		if key != elems[i] {
+			t.Errorf("Walk() - not found [%s]", key)
+		}
+	}
+
+	elems = make([]string, 0, len(keys))
+	if !trie.Walk(nil, handle) {
+		t.Error("Walk() - invalid result")
+	}
+	if len(elems) != 9 {
+		t.Errorf("Walk() - invalid elems length [%v]", elems)
+	}
+	for i, key := range []string{"", "a", "aa", "ab", "aba", "b", "ba", "bab", "bb"} {
+		if key != elems[i] {
+			t.Errorf("Walk() - not found [%s]", key)
+		}
+	}
+
+	elems = make([]string, 0, len(keys))
+	handle = func(key []byte, value interface{}) bool {
+		if k := string(key); k == value {
+			elems = append(elems, k)
+		}
+		if string(key) == "aa" {
+			return false
+		}
+		return true
+	}
+	if trie.Walk([]byte("a"), handle) {
+		t.Error("Walk() - invalid result")
+	}
+	if len(elems) != 2 {
+		t.Errorf("Walk() - invalid elems length [%v]", elems)
+	}
+	for i, key := range []string{"a", "aa"} {
+		if key != elems[i] {
+			t.Errorf("Walk() - not found [%s]", key)
+		}
+	}
+
+	if trie.Walk([]byte("^"), handle) {
+		t.Error("Walk() - invalid result")
+	}
+	if trie.Walk([]byte("aaa"), handle) {
+		t.Error("Walk() - invalid result")
+	}
+	if trie.Walk([]byte("c"), handle) {
+		t.Error("Walk() - invalid result")
+	}
+}
+
 func TestKeyContainsZeroValue(t *testing.T) {
 	trie := critbitgo.NewTrie()
 	trie.Insert([]byte{1, 0, 1}, nil)
