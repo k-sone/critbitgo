@@ -140,33 +140,43 @@ func TestAllprefixed(t *testing.T) {
 	keys := []string{"", "a", "aa", "b", "bb", "ab", "ba", "aba", "bab"}
 	trie := buildTrie(t, keys)
 
-	elems := make(map[string]interface{})
+	elems := make([]string, 0, len(keys))
 	handle := func(key []byte, value interface{}) bool {
-		elems[string(key)] = value
+		if k := string(key); k == value {
+			elems = append(elems, k)
+		}
 		return true
 	}
-	if !trie.Allprefixed([]byte(""), handle) {
+	if !trie.Allprefixed([]byte{}, handle) {
 		t.Error("Allprefixed() - invalid result")
 	}
-	for _, key := range keys {
-		if _, ok := elems[key]; !ok {
+	if len(elems) != 9 {
+		t.Errorf("Allprefixed() - invalid elems length [%v]", elems)
+	}
+	for i, key := range []string{"", "a", "aa", "ab", "aba", "b", "ba", "bab", "bb"} {
+		if key != elems[i] {
 			t.Errorf("Allprefixed() - not found [%s]", key)
 		}
 	}
 
-	elems = make(map[string]interface{})
+	elems = make([]string, 0, len(keys))
 	if !trie.Allprefixed([]byte("a"), handle) {
 		t.Error("Allprefixed() - invalid result")
 	}
-	for _, key := range []string{"a", "aa", "ab", "aba"} {
-		if _, ok := elems[key]; !ok {
+	if len(elems) != 4 {
+		t.Errorf("Allprefixed() - invalid elems length [%v]", elems)
+	}
+	for i, key := range []string{"a", "aa", "ab", "aba"} {
+		if key != elems[i] {
 			t.Errorf("Allprefixed() - not found [%s]", key)
 		}
 	}
 
-	elems = make(map[string]interface{})
+	elems = make([]string, 0, len(keys))
 	handle = func(key []byte, value interface{}) bool {
-		elems[string(key)] = value
+		if k := string(key); k == value {
+			elems = append(elems, k)
+		}
 		if string(key) == "aa" {
 			return false
 		}
@@ -175,15 +185,125 @@ func TestAllprefixed(t *testing.T) {
 	if trie.Allprefixed([]byte("a"), handle) {
 		t.Error("Allprefixed() - invalid result")
 	}
-	for _, key := range []string{"a", "aa"} {
-		if _, ok := elems[key]; !ok {
+	if len(elems) != 2 {
+		t.Errorf("Allprefixed() - invalid elems length [%v]", elems)
+	}
+	for i, key := range []string{"a", "aa"} {
+		if key != elems[i] {
 			t.Errorf("Allprefixed() - not found [%s]", key)
 		}
 	}
-	for _, key := range []string{"ab", "aba"} {
-		if _, ok := elems[key]; ok {
-			t.Errorf("Allprefixed() - phantom found [%s]", key)
+}
+
+func TestLongestPrefix(t *testing.T) {
+	keys := []string{"a", "aa", "b", "bb", "ab", "ba", "aba", "bab"}
+	trie := buildTrie(t, keys)
+
+	expects := map[string]string{
+		"a":   "a",
+		"a^":  "a",
+		"aaa": "aa",
+		"abc": "ab",
+		"bac": "ba",
+		"bbb": "bb",
+		"bc":  "b",
+	}
+	for g, k := range expects {
+		if key, value, ok := trie.LongestPrefix([]byte(g)); !ok || string(key) != k || value != k {
+			t.Errorf("LongestPrefix() - invalid result - %s not %s", key, g)
 		}
+	}
+
+	if _, _, ok := trie.LongestPrefix([]byte{}); ok {
+		t.Error("LongestPrefix() - invalid result - not empty")
+	}
+	if _, _, ok := trie.LongestPrefix([]byte("^")); ok {
+		t.Error("LongestPrefix() - invalid result - not empty")
+	}
+	if _, _, ok := trie.LongestPrefix([]byte("c")); ok {
+		t.Error("LongestPrefix() - invalid result - not empty")
+	}
+}
+
+func TestWalk(t *testing.T) {
+	keys := []string{"", "a", "aa", "b", "bb", "ab", "ba", "aba", "bab"}
+	trie := buildTrie(t, keys)
+
+	elems := make([]string, 0, len(keys))
+	handle := func(key []byte, value interface{}) bool {
+		if k := string(key); k == value {
+			elems = append(elems, k)
+		}
+		return true
+	}
+	if !trie.Walk([]byte{}, handle) {
+		t.Error("Walk() - invalid result")
+	}
+	if len(elems) != 9 {
+		t.Errorf("Walk() - invalid elems length [%v]", elems)
+	}
+	for i, key := range []string{"", "a", "aa", "ab", "aba", "b", "ba", "bab", "bb"} {
+		if key != elems[i] {
+			t.Errorf("Walk() - not found [%s]", key)
+		}
+	}
+
+	elems = make([]string, 0, len(keys))
+	if !trie.Walk([]byte("ab"), handle) {
+		t.Error("Walk() - invalid result")
+	}
+	if len(elems) != 6 {
+		t.Errorf("Walk() - invalid elems length [%v]", elems)
+	}
+	for i, key := range []string{"ab", "aba", "b", "ba", "bab", "bb"} {
+		if key != elems[i] {
+			t.Errorf("Walk() - not found [%s]", key)
+		}
+	}
+
+	elems = make([]string, 0, len(keys))
+	if !trie.Walk(nil, handle) {
+		t.Error("Walk() - invalid result")
+	}
+	if len(elems) != 9 {
+		t.Errorf("Walk() - invalid elems length [%v]", elems)
+	}
+	for i, key := range []string{"", "a", "aa", "ab", "aba", "b", "ba", "bab", "bb"} {
+		if key != elems[i] {
+			t.Errorf("Walk() - not found [%s]", key)
+		}
+	}
+
+	elems = make([]string, 0, len(keys))
+	handle = func(key []byte, value interface{}) bool {
+		if k := string(key); k == value {
+			elems = append(elems, k)
+		}
+		if string(key) == "aa" {
+			return false
+		}
+		return true
+	}
+	if trie.Walk([]byte("a"), handle) {
+		t.Error("Walk() - invalid result")
+	}
+	if len(elems) != 2 {
+		t.Errorf("Walk() - invalid elems length [%v]", elems)
+	}
+	for i, key := range []string{"a", "aa"} {
+		if key != elems[i] {
+			t.Errorf("Walk() - not found [%s]", key)
+		}
+	}
+
+	if trie.Walk([]byte("^"), handle) {
+		t.Error("Walk() - invalid result")
+	}
+	if trie.Walk([]byte("aaa"), handle) {
+		t.Error("Walk() - invalid result")
+	}
+	if trie.Walk([]byte("c"), handle) {
+		t.Error("Walk() - invalid result")
 	}
 }
 
