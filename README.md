@@ -1,3 +1,5 @@
+[![Build Status](https://travis-ci.org/k-sone/critbitgo.svg?branch=master)](https://travis-ci.org/k-sone/critbitgo)
+
 critbitgo
 =========
 
