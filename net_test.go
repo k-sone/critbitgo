@@ -77,7 +77,7 @@ func checkMatch(t *testing.T, trie *critbitgo.Net, request, expect string) {
 	}
 }
 
-func TestNetMatch(t *testing.T) {
+func buildTestNet(t *testing.T) *critbitgo.Net {
 	trie := critbitgo.NewNet()
 
 	cidrs := []string{
@@ -94,11 +94,16 @@ func TestNetMatch(t *testing.T) {
 		"192.168.2.2/32",
 	}
 
-	for _, cidr := range cidrs {
-		if err := trie.AddCIDR(cidr, &cidr); err != nil {
+	for i, cidr := range cidrs {
+		if err := trie.AddCIDR(cidr, cidrs[i]); err != nil {
 			t.Errorf("AddCIDR() - %s: error occurred %s", cidr, err)
 		}
 	}
+	return trie
+}
+
+func TestNetMatch(t *testing.T) {
+	trie := buildTestNet(t)
 
 	checkMatch(t, trie, "10.0.0.0/8", "0.0.0.0/4")
 	checkMatch(t, trie, "192.168.1.0/24", "192.168.1.0/24")
@@ -116,4 +121,34 @@ func TestNetMatch(t *testing.T) {
 	checkMatch(t, trie, "192.168.1.64/32", "192.168.1.0/24")
 	checkMatch(t, trie, "192.168.2.2/32", "192.168.2.2/32")
 	checkMatch(t, trie, "192.168.2.3/32", "192.168.0.0/16")
+}
+
+func TestNetWalk(t *testing.T) {
+	trie := buildTestNet(t)
+
+	var c int
+	f := func(n *net.IPNet, v interface{}) bool {
+		c += 1
+		return true
+	}
+
+	c = 0
+	trie.Walk(nil, f)
+	if c != 11 {
+		t.Errorf("Walk() - %d: full walk", c)
+	}
+
+	_, s, _ := net.ParseCIDR("192.168.1.1/32")
+	c = 0
+	trie.Walk(s, f)
+	if c != 6 {
+		t.Errorf("Walk() - %d: has start route", c)
+	}
+
+	_, s, _ = net.ParseCIDR("10.0.0.0/0")
+	c = 0
+	trie.Walk(s, f)
+	if c != 0 {
+		t.Errorf("Walk() - %d: not found start route", c)
+	}
 }
