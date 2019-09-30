@@ -34,7 +34,6 @@ func buildNet(keys []string) *critbitgo.Net {
 	for i := 0; i < len(keys); i++ {
 		tree.AddCIDR(keys[i], nil)
 	}
-	tree.AddCIDR("0.0.0.0/5", nil)
 	return tree
 }
 
