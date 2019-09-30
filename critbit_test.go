@@ -72,7 +72,7 @@ func TestContains(t *testing.T) {
 
 	for _, key := range keys {
 		if !trie.Contains([]byte(key)) {
-			t.Error("Contains() - not found - %s", key)
+			t.Errorf("Contains() - not found - %s", key)
 		}
 	}
 
@@ -87,7 +87,7 @@ func TestGet(t *testing.T) {
 
 	for _, key := range keys {
 		if value, ok := trie.Get([]byte(key)); value != key || !ok {
-			t.Error("Get() - not found - %s", key)
+			t.Errorf("Get() - not found - %s", key)
 		}
 	}
 
@@ -102,13 +102,13 @@ func TestDelete(t *testing.T) {
 
 	for i, key := range keys {
 		if !trie.Contains([]byte(key)) {
-			t.Error("Delete() - not exists - %s", key)
+			t.Errorf("Delete() - not exists - %s", key)
 		}
 		if v, ok := trie.Delete([]byte(key)); !ok || v != key {
-			t.Error("Delete() - failed - %s", key)
+			t.Errorf("Delete() - failed - %s", key)
 		}
 		if trie.Contains([]byte(key)) {
-			t.Error("Delete() - exists - %s", key)
+			t.Errorf("Delete() - exists - %s", key)
 		}
 		if i != len(keys) {
 			for _, key2 := range keys[i+1:] {
@@ -125,13 +125,13 @@ func TestSize(t *testing.T) {
 	trie := buildTrie(t, keys)
 	klen := len(keys)
 	if s := trie.Size(); s != klen {
-		t.Errorf("Size() - expected [%s], actual [%s]", klen, s)
+		t.Errorf("Size() - expected [%d], actual [%d]", klen, s)
 	}
 
 	for i, key := range keys {
 		trie.Delete([]byte(key))
 		if s := trie.Size(); s != klen-(i+1) {
-			t.Errorf("Size() - expected [%s], actual [%s]", klen, s)
+			t.Errorf("Size() - expected [%d], actual [%d]", klen, s)
 		}
 	}
 }
