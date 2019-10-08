@@ -203,6 +203,35 @@ func (n *Net) Walk(r *net.IPNet, handle func(*net.IPNet, interface{}) bool) {
 	})
 }
 
+// WalkPrefix interates routes that have a given prefix.
+// handle is called with arguments route and value (if handle returns `false`, the iteration is aborted)
+func (n *Net) WalkPrefix(r *net.IPNet, handle func(*net.IPNet, interface{}) bool) {
+	var prefix []byte
+	var div int
+	var last byte
+	if r != nil {
+		if ip, _, err := netValidateIPNet(r); err == nil {
+			prefix = netIPNetToKey(ip, r.Mask)
+			mask := prefix[len(prefix)-1]
+			div = int(mask >> 3)
+			if mod := uint(mask & 0x07); mod > 0 {
+				bit := 8 - mod
+				last = prefix[div] & (0xff >> bit << bit)
+			}
+			prefix = prefix[0:div]
+		}
+	}
+	wrapper := func(key []byte, value interface{}) bool {
+		if last != 0 {
+			if key[div] != last {
+				return true
+			}
+		}
+		return handle(netKeyToIPNet(key), value)
+	}
+	n.trie.Allprefixed(prefix, wrapper)
+}
+
 // Deletes all routes.
 func (n *Net) Clear() {
 	n.trie.Clear()
