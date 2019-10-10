@@ -203,6 +203,47 @@ func (n *Net) Walk(r *net.IPNet, handle func(*net.IPNet, interface{}) bool) {
 	})
 }
 
+func walkMatch(p *node, key []byte, handle func(*net.IPNet, interface{}) bool) bool {
+	if p.internal != nil {
+		if !walkMatch(&p.internal.child[0], key, handle) {
+			return false
+		}
+
+		if key[p.internal.offset]&p.internal.bit > 0 {
+			return walkMatch(&p.internal.child[1], key, handle)
+		}
+		return true
+	}
+
+	mask := p.external.key[len(p.external.key)-1]
+	if key[len(key)-1] < mask {
+		return true
+	}
+
+	div := int(mask >> 3)
+	for i := 0; i < div; i++ {
+		if p.external.key[i] != key[i] {
+			return true
+		}
+	}
+
+	if mod := uint(mask & 0x07); mod > 0 {
+		bit := 8 - mod
+		if p.external.key[div] != key[div]&(0xff>>bit<<bit) {
+			return true
+		}
+	}
+	return handle(netKeyToIPNet(p.external.key), p.external.value)
+}
+
+// WalkMatch interates routes that match a given route.
+// handle is called with arguments route and value (if handle returns `false`, the iteration is aborted)
+func (n *Net) WalkMatch(r *net.IPNet, handle func(*net.IPNet, interface{}) bool) {
+	if n.trie.size > 0 {
+		walkMatch(&n.trie.root, netIPNetToKey(r.IP, r.Mask), handle)
+	}
+}
+
 // Deletes all routes.
 func (n *Net) Clear() {
 	n.trie.Clear()
