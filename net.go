@@ -208,28 +208,26 @@ func (n *Net) Walk(r *net.IPNet, handle func(*net.IPNet, interface{}) bool) {
 func (n *Net) WalkPrefix(r *net.IPNet, handle func(*net.IPNet, interface{}) bool) {
 	var prefix []byte
 	var div int
-	var last byte
+	var bit uint
 	if r != nil {
 		if ip, _, err := netValidateIPNet(r); err == nil {
 			prefix = netIPNetToKey(ip, r.Mask)
 			mask := prefix[len(prefix)-1]
 			div = int(mask >> 3)
-			if mod := uint(mask & 0x07); mod > 0 {
-				bit := 8 - mod
-				last = prefix[div] & (0xff >> bit << bit)
+			if mod := uint(mask & 0x07); mod != 0 {
+				bit = 8 - mod
 			}
-			prefix = prefix[0:div]
 		}
 	}
 	wrapper := func(key []byte, value interface{}) bool {
-		if last != 0 {
-			if key[div] != last {
+		if bit != 0 {
+			if prefix[div]>>bit != key[div]>>bit {
 				return true
 			}
 		}
 		return handle(netKeyToIPNet(key), value)
 	}
-	n.trie.Allprefixed(prefix, wrapper)
+	n.trie.Allprefixed(prefix[0:div], wrapper)
 }
 
 // Deletes all routes.
