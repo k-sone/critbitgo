@@ -206,6 +206,16 @@ func TestAllprefixed(t *testing.T) {
 			t.Errorf("Allprefixed() - not found [%s]", key)
 		}
 	}
+
+	keys = []string{"bad", "badbad"}
+	trie = buildTrie(t, keys)
+	elems = make([]string, 0, len(keys))
+	if !trie.Allprefixed([]byte("ad"), handle) {
+		t.Error("Allprefixed() - invalid result")
+	}
+	if len(elems) != 0 {
+		t.Errorf("Allprefixed() - invalid elems length [%v]", elems)
+	}
 }
 
 func TestLongestPrefix(t *testing.T) {
