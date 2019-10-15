@@ -244,7 +244,7 @@ func (t *Trie) Allprefixed(prefix []byte, handle func(key []byte, value interfac
 		}
 
 		// check prefix
-		if !bytes.Contains(p.external.key, prefix) {
+		if !bytes.HasPrefix(p.external.key, prefix) {
 			return true
 		}
 	}
