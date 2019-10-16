@@ -2,6 +2,7 @@ package critbitgo_test
 
 import (
 	"net"
+	"reflect"
 	"testing"
 
 	"github.com/k-sone/critbitgo"
@@ -81,7 +82,7 @@ func buildTestNet(t *testing.T) *critbitgo.Net {
 	trie := critbitgo.NewNet()
 
 	cidrs := []string{
-		"0.0.0.0/4",
+		"10.0.0.0/8",
 		"192.168.0.0/16",
 		"192.168.1.0/24",
 		"192.168.1.0/28",
@@ -105,7 +106,7 @@ func buildTestNet(t *testing.T) *critbitgo.Net {
 func TestNetMatch(t *testing.T) {
 	trie := buildTestNet(t)
 
-	checkMatch(t, trie, "10.0.0.0/8", "0.0.0.0/4")
+	checkMatch(t, trie, "10.0.0.0/24", "10.0.0.0/8")
 	checkMatch(t, trie, "192.168.1.0/24", "192.168.1.0/24")
 	checkMatch(t, trie, "192.168.1.0/30", "192.168.1.0/28")
 	checkMatch(t, trie, "192.168.1.0/32", "192.168.1.0/32")
@@ -150,5 +151,42 @@ func TestNetWalk(t *testing.T) {
 	trie.Walk(s, f)
 	if c != 0 {
 		t.Errorf("Walk() - %d: not found start route", c)
+	}
+}
+
+func TestNetWalkPrefix(t *testing.T) {
+	trie := buildTestNet(t)
+
+	var ret, exp []string
+	f := func(n *net.IPNet, _ interface{}) bool {
+		ret = append(ret, n.String())
+		return true
+	}
+
+	ret = []string{}
+	exp = []string{"192.168.0.0/16"}
+	_, s, _ := net.ParseCIDR("192.168.0.0/24")
+	trie.WalkPrefix(s, f)
+	if !reflect.DeepEqual(ret, exp) {
+		t.Errorf("WalkPrefix() - failed %s", ret)
+	}
+
+	ret = []string{}
+	exp = []string{
+		"192.168.0.0/16", "192.168.1.0/24", "192.168.1.0/28", "192.168.1.0/32",
+		"192.168.1.1/32", "192.168.1.2/32", "192.168.1.32/27", "192.168.1.32/30",
+	}
+	_, s, _ = net.ParseCIDR("192.168.0.0/23")
+	trie.WalkPrefix(s, f)
+	if !reflect.DeepEqual(ret, exp) {
+		t.Errorf("WalkPrefix() - failed %s", ret)
+	}
+
+	ret = []string{}
+	exp = []string{}
+	_, s, _ = net.ParseCIDR("0.0.0.0/16")
+	trie.WalkPrefix(s, f)
+	if !reflect.DeepEqual(ret, exp) {
+		t.Errorf("WalkPrefix() - failed %s", ret)
 	}
 }
