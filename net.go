@@ -222,7 +222,7 @@ func (n *Net) WalkPrefix(r *net.IPNet, handle func(*net.IPNet, interface{}) bool
 	wrapper := func(key []byte, value interface{}) bool {
 		if bit != 0 {
 			if prefix[div]>>bit != key[div]>>bit {
-				return true
+				return false
 			}
 		}
 		return handle(netKeyToIPNet(key), value)
