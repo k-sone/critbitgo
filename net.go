@@ -209,7 +209,7 @@ func walkMatch(p *node, key []byte, handle func(*net.IPNet, interface{}) bool) b
 			return false
 		}
 
-		if key[p.internal.offset]&p.internal.bit > 0 {
+		if p.internal.offset >= len(key)-1 || key[p.internal.offset]&p.internal.bit > 0 {
 			return walkMatch(&p.internal.child[1], key, handle)
 		}
 		return true
