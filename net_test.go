@@ -190,3 +190,47 @@ func TestNetWalkPrefix(t *testing.T) {
 		t.Errorf("WalkPrefix() - failed %s", ret)
 	}
 }
+
+func TestNetWalkMatch(t *testing.T) {
+	trie := buildTestNet(t)
+
+	var ret, exp []string
+	f := func(n *net.IPNet, _ interface{}) bool {
+		ret = append(ret, n.String())
+		return true
+	}
+
+	ret = []string{}
+	exp = []string{"192.168.0.0/16", "192.168.1.0/24"}
+	_, s, _ := net.ParseCIDR("192.168.1.0/27")
+	trie.WalkMatch(s, f)
+	if !reflect.DeepEqual(ret, exp) {
+		t.Errorf("WalkMatch() - failed %s", ret)
+	}
+
+	ret = []string{}
+	exp = []string{
+		"192.168.0.0/16", "192.168.1.0/24", "192.168.1.0/28", "192.168.1.1/32",
+	}
+	_, s, _ = net.ParseCIDR("192.168.1.1/32")
+	trie.WalkMatch(s, f)
+	if !reflect.DeepEqual(ret, exp) {
+		t.Errorf("WalkMatch() - failed %s", ret)
+	}
+
+	ret = []string{}
+	exp = []string{"10.0.0.0/8"}
+	_, s, _ = net.ParseCIDR("10.0.64.0/18")
+	trie.WalkMatch(s, f)
+	if !reflect.DeepEqual(ret, exp) {
+		t.Errorf("WalkMatch() - failed %s", ret)
+	}
+
+	ret = []string{}
+	exp = []string{}
+	_, s, _ = net.ParseCIDR("255.255.255.0/24")
+	trie.WalkMatch(s, f)
+	if !reflect.DeepEqual(ret, exp) {
+		t.Errorf("WalkMatch() - failed %s", ret)
+	}
+}
