@@ -297,6 +297,9 @@ func longestPrefix(n *node, key []byte) ([]byte, interface{}, bool) {
 // Iterating elements from a given start key.
 // handle is called with arguments key and value (if handle returns `false`, the iteration is aborted)
 func (t *Trie) Walk(start []byte, handle func(key []byte, value interface{}) bool) bool {
+	if t.size == 0 {
+		return true
+	}
 	var seek bool
 	if start != nil {
 		seek = true
