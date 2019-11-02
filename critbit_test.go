@@ -369,3 +369,24 @@ func TestKeyContainsZeroValue(t *testing.T) {
 	}
 	trie.Allprefixed([]byte(""), handle)
 }
+
+func TestEmptyTree(t *testing.T) {
+	trie := critbitgo.NewTrie()
+	key := []byte{0, 1, 2}
+	handle := func(_ []byte, _ interface{}) bool { return true }
+	assert := func(n string, f func()) {
+		defer func() {
+			if e := recover(); e != nil {
+				t.Errorf("%s() - empty tree : %v", n, e)
+			}
+		}()
+		f()
+	}
+
+	assert("Contains", func() { trie.Contains(key) })
+	assert("Get", func() { trie.Get(key) })
+	assert("Delete", func() { trie.Delete(key) })
+	assert("LongestPrefix", func() { trie.LongestPrefix(key) })
+	assert("Allprefixed", func() { trie.Allprefixed(key, handle) })
+	assert("Walk", func() { trie.Walk(key, handle) })
+}
